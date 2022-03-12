@@ -22,8 +22,31 @@ settings_button = pygame.image.load("assets/settings.png").convert_alpha()
 play_button = pygame.image.load("assets/play.png").convert_alpha()
 home_button = pygame.image.load("assets/home.png").convert_alpha()
 player = pygame.image.load("assets/player.png").convert_alpha()
+enemy = pygame.image.load("assets/enemy.png").convert_alpha()
+attack = pygame.image.load("assets/attack.png").convert_alpha()
+defend = pygame.image.load("assets/defend.png").convert_alpha()
 bg_tile = pygame.image.load("assets/bg tile.png").convert_alpha()
 bg_tile.fill((128,128,128), special_flags=pygame.BLEND_RGBA_MULT)
+high_score = 0
+fighting = False
+hp_player = 100
+max_hp_player = 100
+hp_e = 100
+max_hp_e = 100
+score = 0
+success = False
+plr_atk = 10
+e_atk = 10
+plr_def = 0
+e_def = 0
+e_action = ["attack", "defend"]
+e_choice = None
+plr_action = None
+done = False
+
+with open("highscore.json") as f:
+    data = json.load(f)
+    high_score = data["highscore"]
 
 if size == [720, 480]:
     resolution_button = pygame.image.load("assets/480.png").convert_alpha()
@@ -35,6 +58,10 @@ if size == [720, 480]:
     normal_font = pygame.font.Font("assets/font.TTF", 28)
     player = pygame.transform.scale(player, [73, 117])
     bg_tile = pygame.transform.scale(bg_tile, [720, 480])
+    enemy = pygame.transform.scale(enemy, [73, 117])
+    attack = pygame.transform.scale(attack, [40, 40])
+    defend = pygame.transform.scale(defend, [40, 40])
+
 else:
     resolution_button = pygame.image.load("assets/720.png").convert_alpha()
     resolution_button = pygame.transform.scale(resolution_button, [150, 75])
@@ -45,65 +72,24 @@ else:
     big_font = pygame.font.Font("assets/font.TTF", 40)
     player = pygame.transform.scale(player, [110, 176])
     bg_tile = pygame.transform.scale(bg_tile, [1280, 720])
-
+    enemy = pygame.transform.scale(enemy, [110, 176])
+    attack = pygame.transform.scale(attack, [50, 50])
+    defend = pygame.transform.scale(defend, [50, 50])
 
 #   --- whether the problem should show and allow keyboard input or not
-debounce = False
-
-def draw_tutorial():
-    screen.fill((0,0,0))
-    text_text = big_font.render("Tutorial", False, (255, 255, 255))
-    text_text_rect = text_text.get_rect()
-    bg_tile_rect = bg_tile.get_rect()
-
-    text_text_rect.center = (size[0] // 2, size[1] // 2)
-    bg_tile_rect.center = (size[0] // 2, size[1] // 2)
-
-    screen.blit(bg_tile, bg_tile_rect)
-    screen.blit(text_text, text_text_rect)
-    pygame.display.update()
-
-def tutorial():
-    while True:
-        for e in pygame.event.get():
-            if e.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
-        draw_tutorial()
-        clock.tick(60)
-
-def draw_level_select():
-    screen.fill((0,0,0))
-    text_text = big_font.render("Level Select", False, (255,255,255))
-    text_text_rect = text_text.get_rect()
-    bg_tile_rect = bg_tile.get_rect()
-
-    text_text_rect.center = (size[0] // 2, size[1] // 2)
-    bg_tile_rect.center = (size[0] // 2, size[1] // 2)
-
-    screen.blit(bg_tile, bg_tile_rect)
-    screen.blit(text_text, text_text_rect)
-    pygame.display.update()
-
-def level_select():
-    while True:
-        for e in pygame.event.get():
-            if e.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
-            if e.type == pygame.KEYDOWN:
-                if e.key == pygame.K_RETURN:
-                    return
-        draw_level_select()
-        clock.tick(60)
+debounce = True
 
 #   --- draw fight screen ---
 def draw_fight():
     global text
     global problem
+    global attack_rect
+    global defend_rect
 
     screen.fill((0,0,0))
 
+    hb_plr = big_font.render("", False, (255,255,255)) if not fighting else big_font.render(f"{hp_player}/{max_hp_player}, {plr_def}", False, (255,255,255))
+    hb_e = big_font.render("", False, (255,255,255)) if not fighting else big_font.render(f"{hp_e}/{max_hp_e}, {e_def}", False, (255,255,255))
     problem_text = big_font.render("", False, (255, 255, 255)) if debounce else big_font.render(f"Колко е {problem[0]} {problem[2]} {problem[1]}?", True, (255, 255, 255))
     answer_text = normal_font.render("", False, (255, 255, 255)) if debounce else normal_font.render(f"Отговор: {text}", True, (255, 255, 255)) 
 
@@ -111,15 +97,39 @@ def draw_fight():
     problem_rect = problem_text.get_rect()
     answer_rect = answer_text.get_rect()
     player_rect = player.get_rect()
+    enemy_rect = enemy.get_rect()
+    hb_plr_rect = hb_plr.get_rect()
+    hb_e_rect = hb_e.get_rect()
+    attack_rect = attack.get_rect()
+    defend_rect = defend.get_rect()
+
     problem_rect.center = (size[0] // 2, size[1] // 2)
     answer_rect.center = (size[0] // 2, size[1] // 2 + 34)
-    player_rect.center = (size[0] // 10, size[1] // 2)
+    player_rect.center = (size[0] // 5, size[1] // 1.4)
     bg_tile_rect.center = (size[0] // 2, size[1] // 2)
+    enemy_rect.center = (size[0] // 1.1, size[1] // 2)
+    hb_plr_rect.center = (size[0] // 5, size[1] // 1.2)
+    hb_e_rect.center = (size[0] // 1.1, size[1] // 2.6)
+    attack_rect.center = (size[0] // 2.1, size[1] // 1.6)
+    defend_rect.center = (size[0] // 1.9, size[1] // 1.6)
 
     screen.blit(bg_tile, bg_tile_rect)
     screen.blit(problem_text, problem_rect)
     screen.blit(answer_text, answer_rect)
     screen.blit(player, player_rect)
+    screen.blit(enemy, enemy_rect)
+    screen.blit(hb_plr, hb_plr_rect)
+    screen.blit(hb_e, hb_e_rect)
+    if debounce and not done:
+        screen.blit(attack, attack_rect)
+        screen.blit(defend, defend_rect)
+    elif not debounce:
+        attack_rect.center = (size[0] // 1.1, size[1] // 1.6)
+        defend_rect.center = (size[0] // 1.1, size[1] // 1.6)
+        if e_choice == "defend":
+            screen.blit(defend, defend_rect)
+        elif e_choice == "attack":
+            screen.blit(attack, attack_rect)
         
     pygame.display.update()
 
@@ -128,19 +138,29 @@ def game():
     global text
     global problem
     global debounce
+    global hp_e
+    global max_hp_e
+    global score
+    global success
+    global hp_player
+    global bg_tile
+    global plr_action
+    global plr_def
+    global e_def
+    global done
+    global e_choice
     text = ""
-    counter = 0
 
-    with open("tutorial.json") as f:
-        data = json.load(f)
-        if data["done_tutorial"] == False:
-            tutorial()
-        else:
-            level_select()
+    bg_tile = pygame.image.load("assets/bg fight.png")
+    bg_tile.fill((128,128,128), special_flags=pygame.BLEND_RGBA_MULT)
+    if size == [720,480]:
+        bg_tile = pygame.transform.scale(bg_tile, [720, 480])
+    else:
+        bg_tile = pygame.transform.scale(bg_tile, [1280, 720])
 
     #   --- keep the program alive ---
     while True:
-        
+        mouse_x, mouse_y = pygame.mouse.get_pos()
         #   --- event handling ---
         for e in pygame.event.get():
             
@@ -149,6 +169,17 @@ def game():
                 pygame.quit()
                 sys.exit()
             
+            if e.type == pygame.MOUSEBUTTONDOWN and debounce:                
+                e_choice = e_action[random.randint(0, 1)]
+                if attack_rect.collidepoint(mouse_x, mouse_y):
+                    debounce = False
+                    plr_action = "attack"
+                    print("attacked")
+                elif defend_rect.collidepoint(mouse_x, mouse_y):
+                    debounce = False
+                    plr_action = "defend"
+                    print("defended")
+
             #   --- input handling ---
             if e.type == pygame.KEYDOWN:
                 if not debounce: 
@@ -157,14 +188,13 @@ def game():
                     if e.key == pygame.K_RETURN:
                         if text != "":
                             if check(int(text), problem[0], problem[1], problem [2]):
-                                problem = functions.newProblem.newProblem(random.choice(["+", "-", "*", "/"]))
+                                problem = functions.newProblem.newProblem(random.choice(["+", "-", ".", "/"]))
+                                success = True
                                 debounce = True
-                                counter = 0
                             else:
-                                counter += 1
-                                if counter >= 3:
-                                    counter = 0
-                                    problem = functions.newProblem.newProblem(random.choice(["+", "-", "*", "/"]))
+                                problem = functions.newProblem.newProblem(random.choice(["+", "-", ".", "/"]))
+                                success = False
+                                debounce = True
                         text = ""
                     
                     #   --- if backspace is pressed please kill me omg ---
@@ -175,6 +205,37 @@ def game():
                     elif e.key == pygame.K_0 or e.key == pygame.K_1 or e.key == pygame.K_2 or e.key == pygame.K_3 or e.key == pygame.K_4 or e.key == pygame.K_5 or e.key == pygame.K_6 or e.key == pygame.K_7 or e.key == pygame.K_8 or e.key == pygame.K_9:
                         text += e.unicode
 
+        if debounce and not done:
+            if plr_action == "attack" and success:
+                hp_e -= plr_atk - e_def
+                e_def -= plr_atk
+                if e_def < 0:
+                    e_def = 0
+                plr_action = None
+                done = True
+            elif plr_action == "defend" and success:
+                plr_def += random.randint(1, 5)
+                plr_action = None
+                done = True
+            
+        if debounce and done:
+            if e_choice == "attack":
+                hp_player -= e_atk - plr_def
+                plr_def -= e_atk
+                if plr_def < 0:
+                    plr_def = 0
+                print("enemy has attacked")
+                done = False
+            elif e_choice == "defend":
+                increment = random.randint(1, 5)
+                e_def += increment
+                print(f"enemy defense rose +{increment}, {e_def}")
+                done = False
+            
+            
+        
+        if hp_e <= 0:
+            score += 1
 
         draw_fight()
         clock.tick(60)
@@ -262,21 +323,34 @@ def settings():
 def draw_main():
     global settings_rect
     global play_rect
+    
+    screen.fill((0,0,0))
+
+    title = big_font.render("SG RPG", False, (255,255,255))
+    high_score_text = normal_font.render(f"рекорд: {high_score}", False, (255,255,255))
+    
+    title_rect = title.get_rect()
     settings_rect = settings_button.get_rect()
     play_rect = play_button.get_rect()
     bg_tile_rect = bg_tile.get_rect()
+    high_score_text_rect = high_score_text.get_rect()
 
+    title_rect.center = (size[0] // 2, size[1] // 4)
+    high_score_text_rect.center = (size[0] // 2, size[1] // 3)
     bg_tile_rect.center = (size[0] // 2, size[1] // 2)
     settings_rect.center = (size[0] // 2, size[1] // 2 + 24) if size == [720, 480] else (size[0] //  2, size[1] // 2 + 48)
     play_rect.center = (size[0] // 2, size[1] // 2 - 24) if size == [720, 480] else (size[0] //  2, size[1] // 2 - 48)
 
     screen.blit(bg_tile, bg_tile_rect)
+    screen.blit(title, title_rect)
+    screen.blit(high_score_text, high_score_text_rect)
     screen.blit(settings_button, settings_rect)
     screen.blit(play_button, play_rect)
     pygame.display.update()
 
 #   --- main screen loop ---
 def main():
+    global fighting
     while True:
         for e in pygame.event.get():
             
@@ -290,6 +364,7 @@ def main():
                 if settings_rect.collidepoint(mouse_x, mouse_y):
                     settings()
                 if play_rect.collidepoint(mouse_x, mouse_y):
+                    fighting = True
                     game()
         draw_main()
         clock.tick(60)
