@@ -25,6 +25,8 @@ player = pygame.image.load("assets/player.png").convert_alpha()
 enemy = pygame.image.load("assets/enemy.png").convert_alpha()
 attack = pygame.image.load("assets/attack.png").convert_alpha()
 defend = pygame.image.load("assets/defend.png").convert_alpha()
+sleep = pygame.image.load("assets/sleep.png").convert_alpha()
+strength = pygame.image.load("assets/strength.png").convert_alpha()
 bg_tile = pygame.image.load("assets/bg tile.png").convert_alpha()
 bg_tile.fill((128,128,128), special_flags=pygame.BLEND_RGBA_MULT)
 high_score = 0
@@ -35,8 +37,8 @@ hp_e = 100
 max_hp_e = 100
 score = 0
 success = False
-plr_atk = 10
-e_atk = 10
+plr_atk = 1000
+e_atk = 50
 plr_def = 0
 e_def = 0
 e_action = ["attack", "defend"]
@@ -61,6 +63,8 @@ if size == [720, 480]:
     enemy = pygame.transform.scale(enemy, [73, 117])
     attack = pygame.transform.scale(attack, [40, 40])
     defend = pygame.transform.scale(defend, [40, 40])
+    strength = pygame.transform.scale(strength, [75, 100])
+    sleep = pygame.transform.scale(sleep, [75, 100])
 
 else:
     resolution_button = pygame.image.load("assets/720.png").convert_alpha()
@@ -75,6 +79,8 @@ else:
     enemy = pygame.transform.scale(enemy, [110, 176])
     attack = pygame.transform.scale(attack, [50, 50])
     defend = pygame.transform.scale(defend, [50, 50])
+    strength = pygame.transform.scale(strength, [125, 150])
+    sleep = pygame.transform.scale(sleep, [125, 150])
 
 #   --- whether the problem should show and allow keyboard input or not
 debounce = True
@@ -85,6 +91,8 @@ def draw_fight():
     global problem
     global attack_rect
     global defend_rect
+    global strength_rect
+    global sleep_rect
 
     screen.fill((0,0,0))
 
@@ -102,6 +110,8 @@ def draw_fight():
     hb_e_rect = hb_e.get_rect()
     attack_rect = attack.get_rect()
     defend_rect = defend.get_rect()
+    sleep_rect = sleep.get_rect()
+    strength_rect = strength.get_rect()
 
     problem_rect.center = (size[0] // 2, size[1] // 2)
     answer_rect.center = (size[0] // 2, size[1] // 2 + 34)
@@ -112,24 +122,31 @@ def draw_fight():
     hb_e_rect.center = (size[0] // 1.1, size[1] // 2.6)
     attack_rect.center = (size[0] // 2.1, size[1] // 1.6)
     defend_rect.center = (size[0] // 1.9, size[1] // 1.6)
+    sleep_rect.center = (size[0] // 1.8, size[1] // 2)
+    strength_rect.center = (size[0] // 2.2, size[1] // 2)
 
     screen.blit(bg_tile, bg_tile_rect)
     screen.blit(problem_text, problem_rect)
     screen.blit(answer_text, answer_rect)
     screen.blit(player, player_rect)
-    screen.blit(enemy, enemy_rect)
+    if fighting:
+        screen.blit(enemy, enemy_rect)
+        if debounce and not done:
+            screen.blit(attack, attack_rect)
+            screen.blit(defend, defend_rect)
+        elif not debounce:
+            attack_rect.center = (size[0] // 1.1, size[1] // 1.6)
+            defend_rect.center = (size[0] // 1.1, size[1] // 1.6)
+            if e_choice == "defend":
+                screen.blit(defend, defend_rect)
+            elif e_choice == "attack":
+                screen.blit(attack, attack_rect)
+    else:
+        if score > 0:
+            screen.blit(sleep, sleep_rect)
+            screen.blit(strength, strength_rect)
     screen.blit(hb_plr, hb_plr_rect)
     screen.blit(hb_e, hb_e_rect)
-    if debounce and not done:
-        screen.blit(attack, attack_rect)
-        screen.blit(defend, defend_rect)
-    elif not debounce:
-        attack_rect.center = (size[0] // 1.1, size[1] // 1.6)
-        defend_rect.center = (size[0] // 1.1, size[1] // 1.6)
-        if e_choice == "defend":
-            screen.blit(defend, defend_rect)
-        elif e_choice == "attack":
-            screen.blit(attack, attack_rect)
         
     pygame.display.update()
 
@@ -149,6 +166,10 @@ def game():
     global e_def
     global done
     global e_choice
+    global fighting
+    global high_score
+    global plr_atk
+    global max_hp_player
     text = ""
 
     bg_tile = pygame.image.load("assets/bg fight.png")
@@ -168,42 +189,51 @@ def game():
             if e.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
-            
-            if e.type == pygame.MOUSEBUTTONDOWN and debounce:                
-                e_choice = e_action[random.randint(0, 1)]
-                if attack_rect.collidepoint(mouse_x, mouse_y):
-                    debounce = False
-                    plr_action = "attack"
-                    print("attacked")
-                elif defend_rect.collidepoint(mouse_x, mouse_y):
-                    debounce = False
-                    plr_action = "defend"
-                    print("defended")
+            if fighting:
+                if e.type == pygame.MOUSEBUTTONDOWN and debounce:                
+                    e_choice = e_action[random.randint(0, 1)]
+                    if attack_rect.collidepoint(mouse_x, mouse_y):
+                        debounce = False
+                        plr_action = "attack"
+                        print("attacked")
+                    elif defend_rect.collidepoint(mouse_x, mouse_y):
+                        debounce = False
+                        plr_action = "defend"
+                        print("defended")
 
-            #   --- input handling ---
-            if e.type == pygame.KEYDOWN:
-                if not debounce: 
-                    
-                    #   --- if enter is pressed ---
-                    if e.key == pygame.K_RETURN:
-                        if text != "":
-                            if check(int(text), problem[0], problem[1], problem [2]):
-                                problem = functions.newProblem.newProblem(random.choice(["+", "-", ".", "/"]))
-                                success = True
-                                debounce = True
-                            else:
-                                problem = functions.newProblem.newProblem(random.choice(["+", "-", ".", "/"]))
-                                success = False
-                                debounce = True
-                        text = ""
-                    
-                    #   --- if backspace is pressed please kill me omg ---
-                    elif e.key == pygame.K_BACKSPACE:
-                        text = text[:-1]
-                    
-                    #   --- if any number key is pressed send help please ---
-                    elif e.key == pygame.K_0 or e.key == pygame.K_1 or e.key == pygame.K_2 or e.key == pygame.K_3 or e.key == pygame.K_4 or e.key == pygame.K_5 or e.key == pygame.K_6 or e.key == pygame.K_7 or e.key == pygame.K_8 or e.key == pygame.K_9:
-                        text += e.unicode
+                #   --- input handling ---
+                if e.type == pygame.KEYDOWN:
+                    if not debounce: 
+                        
+                        #   --- if enter is pressed ---
+                        if e.key == pygame.K_RETURN:
+                            if text != "":
+                                if check(int(text), problem[0], problem[1], problem [2]):
+                                    problem = functions.newProblem.newProblem(random.choice(["+", "-", ".", "/"]))
+                                    success = True
+                                    debounce = True
+                                else:
+                                    problem = functions.newProblem.newProblem(random.choice(["+", "-", ".", "/"]))
+                                    success = False
+                                    debounce = True
+                            text = ""
+                        
+                        #   --- if backspace is pressed please kill me omg ---
+                        elif e.key == pygame.K_BACKSPACE:
+                            text = text[:-1]
+                        
+                        #   --- if any number key is pressed send help please ---
+                        elif e.key == pygame.K_0 or e.key == pygame.K_1 or e.key == pygame.K_2 or e.key == pygame.K_3 or e.key == pygame.K_4 or e.key == pygame.K_5 or e.key == pygame.K_6 or e.key == pygame.K_7 or e.key == pygame.K_8 or e.key == pygame.K_9:
+                            text += e.unicode
+            else:
+                if e.type == pygame.MOUSEBUTTONDOWN:
+                    if strength_rect.collidepoint(mouse_x, mouse_y):
+                        plr_atk += 10
+                        fighting = True
+                    elif sleep_rect.collidepoint(mouse_x, mouse_y):
+                        max_hp_player += max_hp_player * 0.1
+                        hp_player += max_hp_player * 0.45
+                        fighting = True
 
         if debounce and not done:
             if plr_action == "attack" and success:
@@ -217,8 +247,6 @@ def game():
                 plr_def += random.randint(1, 5)
                 plr_action = None
                 done = True
-            
-        if debounce and done:
             if e_choice == "attack":
                 hp_player -= e_atk - plr_def
                 plr_def -= e_atk
@@ -231,11 +259,25 @@ def game():
                 e_def += increment
                 print(f"enemy defense rose +{increment}, {e_def}")
                 done = False
-            
+            e_choice = None
             
         
         if hp_e <= 0:
             score += 1
+            fighting = False
+            max_hp_e += 10
+            hp_e = max_hp_e
+            e_def = 0
+        elif hp_player <= 0:
+            if score > high_score:
+                with open("highscore.json", "w") as f:
+                    json.dump({"highscore": score}, f)
+                high_score = score
+            hp_player = max_hp_player
+            e_def = 0
+            plr_def = 0
+            return
+            
 
         draw_fight()
         clock.tick(60)
@@ -268,6 +310,12 @@ def settings():
     global size
     global screen
     global bg_tile
+    global strength
+    global sleep
+    global defend
+    global attack
+    global player
+    global enemy
 
     while True:
         screen.fill((0, 0, 0))
@@ -290,6 +338,12 @@ def settings():
                         resolution_button = pygame.image.load("assets/720.png").convert_alpha()
                         resolution_button = pygame.transform.scale(resolution_button, [150, 75])
                         bg_tile = pygame.transform.scale(bg_tile, [1280, 720])
+                        strength = pygame.transform.scale(strength, [125, 150])
+                        sleep = pygame.transform.scale(sleep, [125, 150])
+                        player = pygame.transform.scale(player, [110, 176])
+                        enemy = pygame.transform.scale(enemy, [110, 176])
+                        defend = pygame.transform.scale(defend, [50, 50])
+                        attack = pygame.transform.scale(attack, [50, 50])
 
                         normal_font = pygame.font.Font(None, 36)
                         big_font = pygame.font.Font(None, 40)
@@ -307,6 +361,12 @@ def settings():
                         resolution_button = pygame.image.load("assets/480.png").convert_alpha()
                         resolution_button = pygame.transform.scale(resolution_button, [100, 50])
                         bg_tile = pygame.transform.scale(bg_tile, [720, 480])
+                        strength = pygame.transform.scale(strength, [75, 100])
+                        sleep = pygame.transform.scale(sleep, [75, 100])
+                        player = pygame.transform.scale(player, [73, 117])
+                        enemy = pygame.transform.scale(enemy, [73, 117])
+                        defend = pygame.transform.scale(defend, [40, 40])
+                        attack = pygame.transform.scale(attack, [40, 40])
 
                         normal_font = pygame.font.Font(None, 28)
                         big_font = pygame.font.Font(None, 32)
@@ -364,6 +424,7 @@ def main():
                 if settings_rect.collidepoint(mouse_x, mouse_y):
                     settings()
                 if play_rect.collidepoint(mouse_x, mouse_y):
+                    print("clicked play")
                     fighting = True
                     game()
         draw_main()
