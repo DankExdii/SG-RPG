@@ -1,5 +1,9 @@
 # SG RPG
 
+## Contributor(s)
+
+Ivaylo Bachvarov
+
 ## About
 
 This is an rpg game made for the prosveta competition. It was made as an endless rpg game in which you have to answer second grade math questions in order to progress. The game is made with python, pygame and a little bit of json.
